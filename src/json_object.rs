@@ -13,6 +13,6 @@ pub enum JSONObject {
 
 impl JSONObject {
     pub fn render(&self) -> String {
-        renderer::render_indent(&self, 0, true)
+        renderer::render_indent(self, 0, true)
     }
 }

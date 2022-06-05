@@ -13,7 +13,7 @@ pub fn parse(json_string: &str) -> Result<JSONObject, String> {
 
 fn parse_any(json_string: &str) -> Result<(JSONObject, &str), String> {
     let trimmed = json_string.trim();
-    let first_char = trimmed.chars().next().ok_or("No chars to parse".to_string())?;
+    let first_char = trimmed.chars().next().ok_or_else(|| "No chars to parse".to_string())?;
 
     match first_char {
         '0'..='9' => parse_number(json_string),
@@ -37,7 +37,7 @@ fn parse_keyword(json_string: &str) -> Result<(JSONObject, &str), String> {
             'a'..='z' => {}
             _ => {
                 just_keyword = json_string.get(0..i)
-                    .ok_or("Found non-alphabet character in keyword".to_string())?;
+                    .ok_or_else(|| "Found non-alphabet character in keyword".to_string())?;
 
                 remainder = json_string.get(i..).unwrap();
                 break;
@@ -64,7 +64,7 @@ fn parse_number(json_string: &str) -> Result<(JSONObject, &str), String> {
             '.' => float = true,
             _ => {
                 just_number = json_string.get(0..i)
-                    .ok_or("Found non-numeric character while parsing number".to_string())?;
+                    .ok_or_else(|| "Found non-numeric character while parsing number".to_string())?;
 
                 remainder = json_string.get(i..).unwrap();
                 break;
@@ -74,14 +74,12 @@ fn parse_number(json_string: &str) -> Result<(JSONObject, &str), String> {
     
     match float {
         true => {
-            let number = just_number.parse::<f32>()
-                .or(Err(format!("Failed to parse number {} as f32", just_number)))?;
+            let number = just_number.parse::<f32>().map_err(|_| format!("Failed to parse number {just_number} as f32"))?;
                 
             Ok((JSONObject::Float { value: number }, remainder))
         }
         false => {
-            let number = just_number.parse::<i64>()
-                .or(Err(format!("Failed to parse number {} as i64", just_number)))?;
+            let number = just_number.parse::<i64>().map_err(|_| format!("Failed to parse number {just_number} as i64"))?;
                 
             Ok((JSONObject::Integer { value: number }, remainder))
         }
@@ -91,7 +89,7 @@ fn parse_number(json_string: &str) -> Result<(JSONObject, &str), String> {
 fn parse_string(json_string: &str) -> Result<(JSONObject, &str), String> {
     let mut chars = json_string.trim_start().chars();
 
-    let first_char = chars.next().ok_or("No chars found while parsing string".to_string())?;
+    let first_char = chars.next().ok_or_else(|| "No chars found while parsing string".to_string())?;
 
     if first_char != '\"' {
         return Err(format!("Strings must start with \" but {} was found", first_char));
@@ -100,10 +98,10 @@ fn parse_string(json_string: &str) -> Result<(JSONObject, &str), String> {
     let mut result_string = String::new();
 
     loop {
-        let next_char = chars.next().ok_or("Input ended without closing string".to_string())?;
+        let next_char = chars.next().ok_or_else(|| "Input ended without closing string".to_string())?;
         match next_char {
             '\\' => {
-                let next_char = chars.next().ok_or("Input ended while parsing string escape character".to_string())?;
+                let next_char = chars.next().ok_or_else(|| "Input ended while parsing string escape character".to_string())?;
                 result_string.push(match next_char { // Escaped characters
                     '\"' => next_char,
                     't' => '\t',
@@ -113,9 +111,9 @@ fn parse_string(json_string: &str) -> Result<(JSONObject, &str), String> {
                     'u' => {
                         let mut unicode_seq: String = String::new();
                         for _ in 0..4 {
-                            unicode_seq.push(chars.next().ok_or("Ran out of characters while parsing Unicode sequence".to_string())?);
+                            unicode_seq.push(chars.next().ok_or_else(|| "Ran out of characters while parsing Unicode sequence".to_string())?);
                         }
-                        let unicode_integer: u32 = i64::from_str_radix(&unicode_seq, 16).or(Err(format!("Could not parse Unicode sequence {unicode_seq}")))? as u32;
+                        let unicode_integer: u32 = i64::from_str_radix(&unicode_seq, 16).map_err(|_| format!("Could not parse Unicode sequence {unicode_seq}"))? as u32;
                         let unicode_char: char = char::from_u32(unicode_integer).ok_or(format!("Failed to convert Unicode sequence {unicode_seq} to char"))?;
                         unicode_char
 
@@ -137,7 +135,7 @@ fn parse_array(json_string: &str) -> Result<(JSONObject, &str), String> {
     let mut values = Vec::<JSONObject>::new();
     let mut chars = json_string.chars();
 
-    let first_char = chars.next().ok_or("No chars found while parsing array".to_string())?;
+    let first_char = chars.next().ok_or_else(|| "No chars found while parsing array".to_string())?;
     if first_char != '[' {
         return Err(format!("Arrays must start with [ but found {}", first_char));
     }
@@ -149,7 +147,7 @@ fn parse_array(json_string: &str) -> Result<(JSONObject, &str), String> {
         let next_token = chars.as_str();
 
         // Allow a , or a ]
-        let next_char = chars.next().ok_or("Input ended without closing array".to_string())?;
+        let next_char = chars.next().ok_or_else(|| "Input ended without closing array".to_string())?;
         match next_char {
             ',' => {
                 // Allow any whitespace after ,
@@ -183,7 +181,7 @@ fn parse_object(json_string: &str) -> Result<(JSONObject, &str), String> {
 
     // Parse opening
     {
-        let first_char = chars.next().ok_or("No chars found while parsing object".to_string())?;
+        let first_char = chars.next().ok_or_else(|| "No chars found while parsing object".to_string())?;
 
         if first_char != '{' {
             return Err("Object must start with {".to_string());
@@ -197,7 +195,7 @@ fn parse_object(json_string: &str) -> Result<(JSONObject, &str), String> {
         // Parse key
         {
             let token_start: &str = chars.as_str();
-            let next_char = chars.next().ok_or("Input ended without closing object".to_string())?;
+            let next_char = chars.next().ok_or_else(|| "Input ended without closing object".to_string())?;
 
             match next_char {
                 '}' => {
@@ -216,7 +214,7 @@ fn parse_object(json_string: &str) -> Result<(JSONObject, &str), String> {
 
         // Parse separator
         {
-            let next_char = chars.next().ok_or("Input ended while expecting ':'".to_string())?;
+            let next_char = chars.next().ok_or_else(|| "Input ended while expecting ':'".to_string())?;
             if next_char != ':' {
                 return Err(format!("Missing : between key and value (found {next_char})"));
             }
@@ -238,7 +236,7 @@ fn parse_object(json_string: &str) -> Result<(JSONObject, &str), String> {
 
         // Needs to be either ',' or '}' next
         {
-            let next_char = chars.next().ok_or("Input ended without closing object field".to_string())?;
+            let next_char = chars.next().ok_or_else(|| "Input ended without closing object field".to_string())?;
             match next_char {
                 ',' => {
                     // Can have any amount of whitespace after ,

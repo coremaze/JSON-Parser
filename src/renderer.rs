@@ -3,7 +3,7 @@ use crate::json_object::JSONObject;
 pub fn render_indent(object: &JSONObject, indent: u32, own_line: bool) -> String {
     let yes_padding = " ".repeat(indent as usize);
     let no_padding = "".to_string();
-    let padding = if own_line {yes_padding.clone()} else {no_padding.clone()};
+    let padding = if own_line {yes_padding.clone()} else {no_padding};
     let mut result: String = String::new();
     match object {
         JSONObject::Object { children } => {
